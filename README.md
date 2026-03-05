@@ -18,8 +18,8 @@ Cafe24 마이그레이션용 CSV 파일을 **로컬 CLI**로 검증하는 TypeSc
 ```
 yarn install
 yarn build
-yarn validate -- --type member --input ./input/member.csv --out ./reports/member
-yarn validate -- --type order --input ./input/order.csv --out ./reports/order
+yarn validate --type member --input ./input/member.csv --out ./reports/member
+yarn validate --type order --input ./input/order.csv --out ./reports/order
 ```
 
 **yarn 명령이 실행 불가능 할 경우**
@@ -28,10 +28,6 @@ corepack enable
 corepack prepare yarn@stable --activate
 yarn -v
 ```
-
-인코딩에 문제가 있을 경우
-
-
 
 ---
 
