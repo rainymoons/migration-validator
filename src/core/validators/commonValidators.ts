@@ -18,10 +18,58 @@ const SNS_ID_REGEX = /^(?:(?:nh|ka|fa|ap)@[A-Za-z0-9._-]+|(?:ka|kko)[_-]?[A-Za-z
 const PHONE_REGEX = /^[0-9/-]{1,16}$/;
 const NUMERIC_HYPHEN_REGEX = /^(?=.*\d)[0-9-]+$/;
 const ALNUM_HYPHEN_REGEX = /^[A-Za-z0-9-]+$/;
-const POSTAL_IN_TEXT_REGEX = /(?:\[\s*\d{3,6}-?\d{0,3}\s*\]|\b\d{3,6}-?\d{0,3}\b)/;
 const POSTAL_ONLY_REGEX = /^[0-9-]{1,7}$/;
 const LETTERS_ONLY_REGEX = /^[\p{L}]+$/u;
 const BUSINESS_CODE_REGEX = /^[0-9-]+$/;
+// 상세주소에서는 동-호수(예: 112-903) 오탐이 많아 3-3 하이픈 패턴을 우편번호로 간주하지 않는다.
+const POSTAL_CANDIDATE_REGEX = /(?<!\d)(?:\d{5}|\d{6})(?!\d)/g;
+const BRACKETED_POSTAL_REGEX = /\[\s*(?:\d{5}|\d{6})\s*\]/g;
+const TOKEN_BOUNDARY_REGEX = /[\s,;:()]/;
+const DETAIL_ADDRESS_UNIT_SUFFIX_REGEX = /^\s*(?:동|호|층|번지)\b/;
+
+interface PostalTokenRange {
+  start: number;
+  end: number;
+}
+
+function hasTokenBoundary(value: string, start: number, end: number): boolean {
+  const hasLeftBoundary = start === 0 || TOKEN_BOUNDARY_REGEX.test(value[start - 1]);
+  const hasRightBoundary = end === value.length || TOKEN_BOUNDARY_REGEX.test(value[end]);
+  return hasLeftBoundary && hasRightBoundary;
+}
+
+function findPostalTokenInDetailAddress(value: string): PostalTokenRange | null {
+  const bracketedMatch = value.match(BRACKETED_POSTAL_REGEX);
+  if (bracketedMatch && bracketedMatch.length > 0) {
+    const token = bracketedMatch[0];
+    const start = value.indexOf(token);
+    if (start >= 0) {
+      return { start, end: start + token.length };
+    }
+  }
+
+  for (const match of value.matchAll(POSTAL_CANDIDATE_REGEX)) {
+    const token = match[0];
+    const start = match.index ?? -1;
+    if (start < 0) {
+      continue;
+    }
+    const end = start + token.length;
+    if (!hasTokenBoundary(value, start, end)) {
+      continue;
+    }
+    if (DETAIL_ADDRESS_UNIT_SUFFIX_REGEX.test(value.slice(end))) {
+      continue;
+    }
+    return { start, end };
+  }
+
+  return null;
+}
+
+function removeRange(value: string, range: PostalTokenRange): string {
+  return `${value.slice(0, range.start)}${value.slice(range.end)}`;
+}
 
 export function maxLengthValidator(max: number, code = "MAX_LENGTH_EXCEEDED"): FieldValidator {
   return (value, ctx, field) => {
@@ -365,13 +413,14 @@ export const baseAddressValidator: FieldValidator = (value, ctx, field) => {
 };
 
 export const detailAddressValidator: FieldValidator = (value, ctx, field) => {
-  if (POSTAL_IN_TEXT_REGEX.test(value)) {
+  const postalToken = findPostalTokenInDetailAddress(value);
+  if (postalToken) {
     ctx.addFieldIssue(field.name, {
       severity: "error",
       code: "DETAIL_ADDRESS_CONTAINS_POSTAL_CODE",
       message: "주소(번지미만)에는 우편번호가 포함되면 안 됩니다.",
       rawValue: value,
-      normalizedValue: normalizeWhitespace(value.replace(POSTAL_IN_TEXT_REGEX, "")),
+      normalizedValue: normalizeWhitespace(removeRange(value, postalToken).replace(/\[\s*\]/g, "")),
     });
   }
 };

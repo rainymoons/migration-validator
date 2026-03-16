@@ -1,4 +1,4 @@
-import { DatasetPreset, RowContext } from "../core/types";
+import { DatasetPreset, FieldValidator, RowContext } from "../core/types";
 import { calculateKoreanAge, normalizeDateOnly } from "../core/utils/dateUtils";
 import { isBlank } from "../core/utils/stringUtils";
 import {
@@ -33,6 +33,7 @@ const lifeMemberTrueValues = ["t", "y", "true"];
 const lifeMemberFalseValues = ["f", "n", "false"];
 const yesValues = ["예", "y", "t", "yes", "true"];
 const noValues = ["아니오", "n", "f", "no", "false"];
+const UNKNOWN_BIRTHDATE_SENTINEL = "99992233";
 
 function isToggleTrue(value: string, trueValues: string[]): boolean {
   return trueValues.map((item) => item.toLowerCase()).includes(value.toLowerCase());
@@ -78,6 +79,13 @@ const solarLunarValidator = toggleValidator(
   "INVALID_SOLAR_LUNAR_VALUE",
   "양력(T)/음력(F) 값이 올바르지 않습니다.",
 );
+const memberBirthDateValidator: FieldValidator = (value, ctx, field) => {
+  const digitsOnly = value.replace(/\D/g, "");
+  if (digitsOnly === UNKNOWN_BIRTHDATE_SENTINEL) {
+    return;
+  }
+  return dateOnlyValidator(value, ctx, field);
+};
 
 export const memberPreset: DatasetPreset<MemberState> = {
   type: "member",
@@ -108,7 +116,7 @@ export const memberPreset: DatasetPreset<MemberState> = {
     { name: "비밀번호", requiredHeader: true },
     { name: "성별", requiredHeader: true, validators: [genderValidator] },
     { name: "나이", requiredHeader: true, validators: [integerValidator] },
-    { name: "생년월일", requiredHeader: true, validators: [dateOnlyValidator] },
+    { name: "생년월일", requiredHeader: true, validators: [memberBirthDateValidator] },
     { name: "양력(T)/음력(F)", requiredHeader: true, validators: [solarLunarValidator] },
     { name: "회원등급", requiredHeader: true, validators: [maxLengthValidator(20)] },
     { name: "별명", requiredHeader: true, validators: [nicknameValidator] },

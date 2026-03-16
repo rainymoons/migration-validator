@@ -16,6 +16,7 @@ const ISSUE_HEADERS = [
   "rawValue",
   "normalizedValue",
 ] as const;
+const UTF8_BOM = "\uFEFF";
 
 function toCsvLine(issue: ValidationIssue): string {
   const values = [
@@ -40,6 +41,10 @@ export class IssueCsvWriter {
     ensureDirectory(outputDirectory);
     this.errorStream = fs.createWriteStream(path.join(outputDirectory, "errors.csv"), { encoding: "utf8" });
     this.warningStream = fs.createWriteStream(path.join(outputDirectory, "warnings.csv"), { encoding: "utf8" });
+
+    // Excel 등에서 UTF-8을 자동 인식하도록 BOM을 추가한다.
+    this.errorStream.write(UTF8_BOM);
+    this.warningStream.write(UTF8_BOM);
 
     const headerLine = `${ISSUE_HEADERS.join(",")}\n`;
     this.errorStream.write(headerLine);

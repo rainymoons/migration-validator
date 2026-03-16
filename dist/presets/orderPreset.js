@@ -7,9 +7,7 @@ const paymentDivisionValidator = (0, commonValidators_1.toggleValidator)(["t", "
 exports.orderPreset = {
     type: "order",
     displayName: "주문",
-    createState: () => ({
-        seenItemCodes: new Map(),
-    }),
+    createState: () => ({}),
     fields: [
         {
             name: "주문번호",
@@ -21,7 +19,7 @@ exports.orderPreset = {
         },
         {
             name: "품목코드",
-            requiredHeader: true,
+            requiredHeader: false,
             validators: [
                 (0, commonValidators_1.numberHyphenValidator)(32, "INVALID_ITEM_CODE_FORMAT", "품목코드는 숫자와 하이픈(-)만 허용되며 32자 이하여야 합니다."),
             ],
@@ -68,31 +66,27 @@ exports.orderPreset = {
                 (0, commonValidators_1.alphaNumericHyphenValidator)(50, "INVALID_PRODUCT_UNIQUE_NO", "상품고유번호는 영문, 숫자, 하이픈(-)만 허용되며 50자 이하여야 합니다."),
             ],
         },
-        { name: "상품자체코드", validators: [(0, commonValidators_1.maxLengthValidator)(40)] },
+        { name: "상품자체코드", aliases: ["상품 자체코드"], validators: [(0, commonValidators_1.maxLengthValidator)(40)] },
     ],
     rowValidators: [
         (ctx) => {
-            const itemCode = ctx.getValue("품목코드");
+            const itemCodeFieldName = ctx.hasHeader("품목코드")
+                ? "품목코드"
+                : ctx.hasHeader("상품자체코드")
+                    ? "상품자체코드"
+                    : null;
+            if (!itemCodeFieldName) {
+                return;
+            }
+            const itemCode = ctx.getValue(itemCodeFieldName);
             if ((0, stringUtils_1.isBlank)(itemCode)) {
-                ctx.addFieldIssue("품목코드", {
+                ctx.addFieldIssue(itemCodeFieldName, {
                     severity: "warning",
                     code: "MISSING_ITEM_CODE",
-                    message: "품목코드가 없으면 이전 후 품목별 상태 수정이 제한될 수 있습니다.",
+                    message: "품목코드/상품 자체코드가 없으면 이전 후 품목별 상태 수정이 제한될 수 있습니다.",
                     rawValue: itemCode,
                 });
-                return;
             }
-            const firstRow = ctx.state.seenItemCodes.get(itemCode);
-            if (firstRow) {
-                ctx.addFieldIssue("품목코드", {
-                    severity: "error",
-                    code: "DUPLICATE_ITEM_CODE",
-                    message: `품목코드가 중복되었습니다. 최초 등장 행: ${firstRow}`,
-                    rawValue: itemCode,
-                });
-                return;
-            }
-            ctx.state.seenItemCodes.set(itemCode, ctx.rowNumber);
         },
         (ctx) => {
             if (ctx.hasHeader("주문자아이디") && (0, stringUtils_1.isBlank)(ctx.getValue("주문자아이디"))) {
